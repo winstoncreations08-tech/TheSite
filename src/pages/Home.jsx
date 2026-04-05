@@ -315,7 +315,8 @@ const styles = {
     backdropFilter: 'blur(12px)',
     WebkitBackdropFilter: 'blur(12px)',
     padding: '40px 48px',
-    minWidth: '280px',
+    width: '320px',
+    minHeight: '220px',
     animation: 'cardFadeIn 0.6s ease-out',
   },
   spinnerWrapper: {
