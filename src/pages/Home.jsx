@@ -33,8 +33,55 @@ const Home = () => {
   const [closeMsg, setCloseMsg] = useState('');
   const opened = useRef(false);
 
-  const openProxiedTab = useCallback(() => {
+  // Wait until a service worker is actively controlling the page (handles proxy routes)
+  const waitForSW = useCallback(() => {
+    return new Promise((resolve) => {
+      if (!('serviceWorker' in navigator)) { resolve(); return; }
+
+      // Already controlled → SW is active and intercepting
+      if (navigator.serviceWorker.controller) { resolve(); return; }
+
+      // Use navigator.serviceWorker.ready which resolves when a SW is active
+      // PLUS listen for controllerchange (first install needs a page claim)
+      let resolved = false;
+      const done = () => {
+        if (resolved) return;
+        resolved = true;
+        resolve();
+      };
+
+      // controllerchange fires when a new SW takes control (e.g., via clients.claim())
+      navigator.serviceWorker.addEventListener('controllerchange', done, { once: true });
+
+      // navigator.serviceWorker.ready resolves when registration has an active worker
+      navigator.serviceWorker.ready.then(async (reg) => {
+        // The SW is 'active' but may not yet be 'controlling' this page.
+        // Give it a moment for clients.claim() to propagate, then resolve.
+        if (navigator.serviceWorker.controller) {
+          done();
+          return;
+        }
+        // Wait up to 5s for the controller to appear
+        let waited = 0;
+        const poll = setInterval(() => {
+          waited += 150;
+          if (navigator.serviceWorker.controller || waited >= 5000) {
+            clearInterval(poll);
+            done();
+          }
+        }, 150);
+      });
+
+      // Hard timeout: resolve after 12s no matter what
+      setTimeout(done, 12000);
+    });
+  }, []);
+
+  const openProxiedTab = useCallback(async () => {
     if (opened.current) return;
+
+    // Wait for the service worker to be ready FIRST, before building the URL
+    await waitForSW();
 
     const proxyUrl = buildProxyUrl(PROXY_TARGET, false, 'auto');
     if (!proxyUrl) {
@@ -60,8 +107,28 @@ const Home = () => {
     iframe.style.height = '100%';
     iframe.style.margin = '0';
     iframe.style.display = 'block';
+
+    // Set the iframe src to the proxy URL
     iframe.src = proxyUrl;
     win.document.body.appendChild(iframe);
+
+    // Retry mechanism: if the iframe fails to load (SW wasn't fully ready),
+    // re-set the src after a short delay to give the SW time to start intercepting
+    const retryLoad = () => {
+      try {
+        // Check if the iframe is still about:blank or failed to load
+        const iframeSrc = iframe.contentWindow?.location?.href;
+        if (iframeSrc === 'about:blank' || !iframeSrc) {
+          iframe.src = proxyUrl;
+        }
+      } catch (e) {
+        // Cross-origin means it loaded something — that's good
+      }
+    };
+
+    // Retry at 1.5s and 3s if needed
+    setTimeout(retryLoad, 1500);
+    setTimeout(retryLoad, 3000);
 
     setDone(true);
     setFavicon(DONE_STEP.emoji);
@@ -73,7 +140,7 @@ const Home = () => {
         setCloseMsg(CLOSE_MSG);
       }, 300);
     }, 600);
-  }, []);
+  }, [waitForSW]);
 
   useEffect(() => {
     setFavicon(STEPS[0].emoji);
