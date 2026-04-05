@@ -118,16 +118,9 @@ const Home = () => {
     setFavicon(DONE_STEP.emoji);
     document.title = DONE_STEP.title;
 
-    // Wait a bit for the iframe inside the popup to start loading before
-    // attempting to close this launcher tab. If window.close() is blocked
-    // by the browser, show the "you can close this tab" message instead.
     setTimeout(() => {
-      window.close();
-      // If we're still here (browser blocked window.close), show the message
-      setTimeout(() => {
-        setCloseMsg(CLOSE_MSG);
-      }, 400);
-    }, 1500);
+      setCloseMsg(CLOSE_MSG);
+    }, 800);
   }, [waitForSW]);
 
   useEffect(() => {
