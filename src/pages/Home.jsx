@@ -10,7 +10,7 @@ const STEPS = [
   { message: 'Redirecting now...',            title: 'Redirecting...',   emoji: '🚀' },
 ];
 
-const DONE_STEP = { message: 'Window opened! ✓', title: 'Done', emoji: '✅' };
+const DONE_STEP = { message: 'Window opened!', title: 'Done', emoji: '✅' };
 const CLOSE_MSG = 'You can close this tab now.';
 
 function setFavicon(emoji) {
@@ -33,28 +33,23 @@ const Home = () => {
   const [closeMsg, setCloseMsg] = useState('');
   const opened = useRef(false);
 
-  // Build the proxy URL and open it in a hidden-URL-bar new tab (about:blank + iframe)
   const openProxiedTab = useCallback(() => {
     if (opened.current) return;
 
-    // Build the encoded proxy URL using the site's built-in proxy system
     const proxyUrl = buildProxyUrl(PROXY_TARGET, false, 'auto');
     if (!proxyUrl) {
       setShowFallback(true);
       return;
     }
 
-    // Open a new about:blank tab with an iframe — hides the URL bar
     const win = window.open('', '_blank');
     if (!win || win.closed) {
-      // Popup was blocked
       setShowFallback(true);
       return;
     }
 
     opened.current = true;
 
-    // Write the iframe into the new tab
     win.document.documentElement.style.height = '100%';
     win.document.body.style.margin = '0';
     win.document.body.style.height = '100%';
@@ -68,16 +63,12 @@ const Home = () => {
     iframe.src = proxyUrl;
     win.document.body.appendChild(iframe);
 
-    // Update loading screen to show success
     setDone(true);
     setFavicon(DONE_STEP.emoji);
     document.title = DONE_STEP.title;
 
-    // Try to auto-close this tab after a brief moment
     setTimeout(() => {
       window.close();
-      // If window.close() didn't work (browser restriction),
-      // show a message telling the user they can close the tab
       setTimeout(() => {
         setCloseMsg(CLOSE_MSG);
       }, 300);
@@ -85,11 +76,9 @@ const Home = () => {
   }, []);
 
   useEffect(() => {
-    // Set initial favicon and title
     setFavicon(STEPS[0].emoji);
     document.title = STEPS[0].title;
 
-    // Cycle through loading messages
     const stepInterval = setInterval(() => {
       if (opened.current) return;
       setFadeIn(false);
@@ -106,12 +95,11 @@ const Home = () => {
       }, 300);
     }, 650);
 
-    // Open the proxied tab after ~2.6s
     const openTimer = setTimeout(() => {
       openProxiedTab();
     }, 2600);
 
-    // Show fallback button 2s after "Redirecting now..." appears (~4.6s total)
+    // Show fallback button 2s after "Redirecting now..." appears
     const fallbackTimer = setTimeout(() => {
       if (!opened.current) {
         setShowFallback(true);
@@ -130,63 +118,70 @@ const Home = () => {
 
   return (
     <div style={styles.container}>
-      {/* Subtle radial glow */}
-      <div style={styles.glowOrb} />
+      {/* Noise texture overlay */}
+      <div style={styles.noiseOverlay} />
 
-      {/* Spinner — hide when done */}
-      {!done && (
-        <div style={styles.spinnerWrapper}>
-          <div style={styles.spinnerOuter}>
-            <div style={styles.spinnerInner} />
+      {/* Animated gradient orbs */}
+      <div style={styles.orbTopLeft} />
+      <div style={styles.orbBottomRight} />
+
+      {/* Main card */}
+      <div style={styles.card}>
+        {/* Spinner — hide when done */}
+        {!done && (
+          <div style={styles.spinnerWrapper}>
+            <div style={styles.spinnerOuter}>
+              <div style={styles.spinnerInner} />
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Checkmark when done */}
-      {done && <div style={styles.checkmark}>✓</div>}
+        {/* Checkmark when done */}
+        {done && <div style={styles.checkmark}>✓</div>}
 
-      {/* Message */}
-      <p
-        style={{
-          ...styles.message,
-          opacity: fadeIn || done ? 1 : 0,
-          transform: fadeIn || done ? 'translateY(0)' : 'translateY(8px)',
-        }}
-      >
-        {currentMsg}
-      </p>
-
-      {/* "You can close this tab" message */}
-      {closeMsg && (
-        <p style={styles.closeMsg}>{closeMsg}</p>
-      )}
-
-      {/* Progress bar */}
-      <div style={styles.progressTrack}>
-        <div
+        {/* Message */}
+        <p
           style={{
-            ...styles.progressFill,
-            width: `${progress}%`,
-            ...(done ? { background: '#4a9a6a', animation: 'none' } : {}),
+            ...styles.message,
+            opacity: fadeIn || done ? 1 : 0,
+            transform: fadeIn || done ? 'translateY(0)' : 'translateY(8px)',
           }}
-        />
-      </div>
+        >
+          {currentMsg}
+        </p>
 
-      {/* Step dots */}
-      <div style={styles.dotsRow}>
-        {STEPS.map((_, i) => (
+        {/* "You can close this tab" message */}
+        {closeMsg && (
+          <p style={styles.closeMsg}>{closeMsg}</p>
+        )}
+
+        {/* Progress bar */}
+        <div style={styles.progressTrack}>
           <div
-            key={i}
             style={{
-              ...styles.dot,
-              backgroundColor: i <= step || done ? (done ? '#4a9a6a' : '#6c8ebf') : '#1f324e',
-              transform: i <= step || done ? 'scale(1.2)' : 'scale(1)',
+              ...styles.progressFill,
+              width: `${progress}%`,
+              ...(done ? { background: '#22c55e', animation: 'none' } : {}),
             }}
           />
-        ))}
+        </div>
+
+        {/* Step dots */}
+        <div style={styles.dotsRow}>
+          {STEPS.map((_, i) => (
+            <div
+              key={i}
+              style={{
+                ...styles.dot,
+                backgroundColor: i <= step || done ? (done ? '#22c55e' : '#a1a1aa') : '#27272a',
+                transform: i <= step || done ? 'scale(1.2)' : 'scale(1)',
+              }}
+            />
+          ))}
+        </div>
       </div>
 
-      {/* Fallback button — shown if popup blocked or proxy failed */}
+      {/* Fallback button — shown if popup blocked or taking too long */}
       <div
         style={{
           ...styles.fallbackWrapper,
@@ -198,20 +193,25 @@ const Home = () => {
           onClick={openProxiedTab}
           style={styles.fallbackButton}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#1a2d45';
-            e.currentTarget.style.borderColor = '#6c8ebf';
-            e.currentTarget.style.boxShadow = '0 0 20px rgba(108, 142, 191, 0.3)';
-            e.currentTarget.style.color = '#ecf6ff';
+            e.currentTarget.style.backgroundColor = '#18181b';
+            e.currentTarget.style.borderColor = '#a1a1aa';
+            e.currentTarget.style.boxShadow = '0 0 24px rgba(255, 255, 255, 0.06)';
+            e.currentTarget.style.color = '#fafafa';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#141d2b';
-            e.currentTarget.style.borderColor = '#4a6a94';
-            e.currentTarget.style.boxShadow = '0 0 12px rgba(108, 142, 191, 0.15)';
-            e.currentTarget.style.color = '#c1d4f1';
+            e.currentTarget.style.backgroundColor = '#0a0a0a';
+            e.currentTarget.style.borderColor = '#3f3f46';
+            e.currentTarget.style.boxShadow = '0 0 12px rgba(255, 255, 255, 0.03)';
+            e.currentTarget.style.color = '#a1a1aa';
           }}
         >
           Didn't open? Click here
         </button>
+      </div>
+
+      {/* Footer pill */}
+      <div style={styles.footerPill}>
+        Winston
       </div>
 
       {/* Keyframes */}
@@ -221,25 +221,39 @@ const Home = () => {
 };
 
 const keyframes = `
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap');
+
   @keyframes loaderSpin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
   }
   @keyframes pulseGlow {
-    0%, 100% { opacity: 0.35; transform: translate(-50%, -50%) scale(1); }
-    50% { opacity: 0.55; transform: translate(-50%, -50%) scale(1.08); }
+    0%, 100% { opacity: 0.45; transform: translate(-50%, -50%) scale(1); }
+    50% { opacity: 0.7; transform: translate(-50%, -50%) scale(1.1); }
+  }
+  @keyframes orbFloat1 {
+    0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.18; }
+    50% { transform: translate(15px, -20px) scale(1.05); opacity: 0.28; }
+  }
+  @keyframes orbFloat2 {
+    0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.14; }
+    50% { transform: translate(-12px, 18px) scale(1.08); opacity: 0.22; }
   }
   @keyframes shimmer {
     0% { background-position: -200% 0; }
     100% { background-position: 200% 0; }
   }
   @keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(12px); }
+    from { opacity: 0; transform: translateY(14px); }
     to { opacity: 1; transform: translateY(0); }
   }
   @keyframes borderPulse {
-    0%, 100% { border-color: #4a6a94; box-shadow: 0 0 12px rgba(108, 142, 191, 0.15); }
-    50% { border-color: #6c8ebf; box-shadow: 0 0 18px rgba(108, 142, 191, 0.25); }
+    0%, 100% { border-color: #3f3f46; box-shadow: 0 0 12px rgba(255, 255, 255, 0.03); }
+    50% { border-color: #52525b; box-shadow: 0 0 20px rgba(255, 255, 255, 0.06); }
+  }
+  @keyframes cardFadeIn {
+    from { opacity: 0; transform: translateY(24px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
   }
 `;
 
@@ -252,85 +266,123 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#111827',
+    backgroundColor: '#09090b',
     fontFamily:
-      "'Geist', 'Inter', 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+      "'Inter', 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
     overflow: 'hidden',
   },
-  glowOrb: {
-    position: 'absolute',
-    top: '45%',
-    left: '50%',
-    width: '420px',
-    height: '420px',
-    borderRadius: '50%',
-    background: 'radial-gradient(circle, rgba(108, 142, 191, 0.12) 0%, transparent 70%)',
-    animation: 'pulseGlow 4s ease-in-out infinite',
+  noiseOverlay: {
+    position: 'fixed',
+    inset: 0,
+    backgroundImage: "url('https://grainy-gradients.vercel.app/noise.svg')",
+    opacity: 0.20,
     pointerEvents: 'none',
+    mixBlendMode: 'overlay',
+  },
+  orbTopLeft: {
+    position: 'fixed',
+    top: '-8%',
+    left: '8%',
+    width: '440px',
+    height: '440px',
+    borderRadius: '50%',
+    background: 'rgba(255, 255, 255, 0.04)',
+    filter: 'blur(118px)',
+    pointerEvents: 'none',
+    animation: 'orbFloat1 6s ease-in-out infinite',
+  },
+  orbBottomRight: {
+    position: 'fixed',
+    bottom: '-8%',
+    right: '8%',
+    width: '440px',
+    height: '440px',
+    borderRadius: '50%',
+    background: 'rgba(255, 255, 255, 0.03)',
+    filter: 'blur(118px)',
+    pointerEvents: 'none',
+    animation: 'orbFloat2 7s ease-in-out infinite',
+  },
+  card: {
+    position: 'relative',
+    zIndex: 10,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    borderRadius: '16px',
+    border: '1px solid #27272a',
+    backgroundColor: 'rgba(9, 9, 11, 0.6)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+    padding: '40px 48px',
+    minWidth: '280px',
+    animation: 'cardFadeIn 0.6s ease-out',
   },
   spinnerWrapper: {
     position: 'relative',
-    width: '56px',
-    height: '56px',
-    marginBottom: '28px',
+    width: '52px',
+    height: '52px',
+    marginBottom: '24px',
   },
   spinnerOuter: {
-    width: '56px',
-    height: '56px',
+    width: '52px',
+    height: '52px',
     borderRadius: '50%',
-    border: '3px solid #1f324e',
-    borderTopColor: '#6c8ebf',
-    animation: 'loaderSpin 0.9s linear infinite',
+    border: '2.5px solid #27272a',
+    borderTopColor: '#a1a1aa',
+    animation: 'loaderSpin 0.85s linear infinite',
     boxSizing: 'border-box',
   },
   spinnerInner: {
     position: 'absolute',
-    top: '8px',
-    left: '8px',
-    width: '36px',
-    height: '36px',
+    top: '7px',
+    left: '7px',
+    width: '34px',
+    height: '34px',
     borderRadius: '50%',
     border: '2px solid transparent',
-    borderBottomColor: '#4a6a94',
-    animation: 'loaderSpin 1.4s linear infinite reverse',
+    borderBottomColor: '#52525b',
+    animation: 'loaderSpin 1.3s linear infinite reverse',
     boxSizing: 'border-box',
   },
   checkmark: {
-    fontSize: '48px',
-    color: '#4a9a6a',
-    marginBottom: '20px',
+    fontSize: '44px',
+    color: '#22c55e',
+    marginBottom: '18px',
     animation: 'fadeInUp 0.4s ease-out',
+    fontWeight: '700',
   },
   message: {
     fontSize: '15px',
     fontWeight: 500,
-    color: '#a0b0c8',
+    color: '#a1a1aa',
     letterSpacing: '0.3px',
-    marginBottom: '10px',
+    marginBottom: '8px',
     transition: 'opacity 0.3s ease, transform 0.3s ease',
     userSelect: 'none',
+    textAlign: 'center',
   },
   closeMsg: {
     fontSize: '13px',
     fontWeight: 400,
-    color: '#6b7a8f',
-    marginBottom: '20px',
+    color: '#52525b',
+    marginBottom: '18px',
     animation: 'fadeInUp 0.4s ease-out',
     userSelect: 'none',
   },
   progressTrack: {
-    width: '220px',
-    height: '4px',
-    backgroundColor: '#1a2235',
+    width: '200px',
+    height: '3px',
+    backgroundColor: '#18181b',
     borderRadius: '4px',
     overflow: 'hidden',
-    marginBottom: '16px',
-    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.3)',
+    marginBottom: '14px',
+    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.4)',
   },
   progressFill: {
     height: '100%',
     borderRadius: '4px',
-    background: 'linear-gradient(90deg, #4a6a94, #6c8ebf, #4a6a94)',
+    background: 'linear-gradient(90deg, #3f3f46, #71717a, #3f3f46)',
     backgroundSize: '200% 100%',
     animation: 'shimmer 2s linear infinite',
     transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -338,35 +390,53 @@ const styles = {
   dotsRow: {
     display: 'flex',
     gap: '8px',
-    marginBottom: '32px',
+    marginBottom: '0',
   },
   dot: {
-    width: '6px',
-    height: '6px',
+    width: '5px',
+    height: '5px',
     borderRadius: '50%',
     transition: 'all 0.4s ease',
   },
   fallbackWrapper: {
     position: 'absolute',
-    bottom: '48px',
+    bottom: '56px',
     transition: 'opacity 0.6s ease',
+    zIndex: 10,
   },
   fallbackButton: {
     display: 'inline-block',
     padding: '12px 28px',
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: 600,
-    color: '#c1d4f1',
-    backgroundColor: '#141d2b',
-    border: '1px solid #4a6a94',
-    borderRadius: '12px',
+    color: '#a1a1aa',
+    backgroundColor: '#0a0a0a',
+    border: '1px solid #3f3f46',
+    borderRadius: '9999px',
     textDecoration: 'none',
     cursor: 'pointer',
     transition: 'all 0.25s ease',
-    letterSpacing: '0.3px',
+    letterSpacing: '0.2px',
     fontFamily: 'inherit',
-    boxShadow: '0 0 12px rgba(108, 142, 191, 0.15)',
+    boxShadow: '0 0 12px rgba(255, 255, 255, 0.03)',
     animation: 'borderPulse 2.5s ease-in-out infinite',
+  },
+  footerPill: {
+    position: 'absolute',
+    bottom: '20px',
+    fontSize: '11px',
+    color: '#3f3f46',
+    borderRadius: '9999px',
+    padding: '6px 16px',
+    border: '1px solid #1c1c1f',
+    backgroundColor: 'rgba(9, 9, 11, 0.5)',
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
+    letterSpacing: '0.15em',
+    textTransform: 'uppercase',
+    fontWeight: 500,
+    userSelect: 'none',
+    zIndex: 10,
   },
 };
 
