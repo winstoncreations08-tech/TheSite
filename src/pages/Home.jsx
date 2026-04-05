@@ -89,30 +89,13 @@ const Home = () => {
       return;
     }
 
-    const win = window.open('about:blank', '_blank');
+    const win = window.open(proxyUrl, '_blank');
     if (!win || win.closed) {
       setShowFallback(true);
       return;
     }
 
     opened.current = true;
-
-    // Write a complete, self-contained HTML document into the popup.
-    // This makes the page independent of the opener — it will keep working
-    // even after this launcher tab is closed.
-    const escapedUrl = proxyUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-    win.document.open();
-    win.document.write(
-      '<!DOCTYPE html>' +
-      '<html style="height:100%">' +
-      '<head><title>Winston</title></head>' +
-      '<body style="margin:0;height:100%;overflow:hidden">' +
-      '<iframe src="' + escapedUrl + '" ' +
-      'style="border:none;width:100%;height:100%;margin:0;display:block" ' +
-      'allowfullscreen></iframe>' +
-      '</body></html>'
-    );
-    win.document.close();
 
     setDone(true);
     setFavicon(DONE_STEP.emoji);
