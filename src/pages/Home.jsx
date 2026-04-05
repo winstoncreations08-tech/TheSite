@@ -111,12 +111,12 @@ const Home = () => {
       openProxiedTab();
     }, 2600);
 
-    // Fallback link after 5s if nothing happened
+    // Show fallback button 2s after "Redirecting now..." appears (~4.6s total)
     const fallbackTimer = setTimeout(() => {
       if (!opened.current) {
         setShowFallback(true);
       }
-    }, 5000);
+    }, 4600);
 
     return () => {
       clearInterval(stepInterval);
@@ -210,7 +210,7 @@ const Home = () => {
             e.currentTarget.style.color = '#c1d4f1';
           }}
         >
-          Click here if the window didn't open
+          Didn't open? Click here
         </button>
       </div>
 
