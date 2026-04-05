@@ -4,13 +4,13 @@ import { process as buildProxyUrl } from '/src/utils/hooks/loader/utils';
 const PROXY_TARGET = 'https://winstonwebsite.vercel.app';
 
 const STEPS = [
-  { message: 'Loading...',                    title: 'Loading...',      emoji: '⏳' },
-  { message: 'Opening window, please wait...', title: 'Please wait...',  emoji: '🔄' },
-  { message: 'Almost there...',               title: 'Almost there...',  emoji: '⚡' },
-  { message: 'Redirecting now...',            title: 'Redirecting...',   emoji: '🚀' },
+  { message: 'Registering services...',        title: 'Loading...',      emoji: '⏳' },
+  { message: 'Establishing connection...',     title: 'Connecting...',   emoji: '🔄' },
+  { message: 'Preparing secure tunnel...',     title: 'Preparing...',    emoji: '⚡' },
+  { message: 'Opening in new window...',       title: 'Launching...',    emoji: '🚀' },
 ];
 
-const DONE_STEP = { message: 'Window opened!', title: 'Done', emoji: '✅' };
+const DONE_STEP = { message: 'Window opened — you\'re all set!', title: 'Done', emoji: '✅' };
 const CLOSE_MSG = 'You can close this tab now.';
 
 function setFavicon(emoji) {
@@ -89,7 +89,7 @@ const Home = () => {
       return;
     }
 
-    const win = window.open('', '_blank');
+    const win = window.open('about:blank', '_blank');
     if (!win || win.closed) {
       setShowFallback(true);
       return;
@@ -97,49 +97,37 @@ const Home = () => {
 
     opened.current = true;
 
-    win.document.documentElement.style.height = '100%';
-    win.document.body.style.margin = '0';
-    win.document.body.style.height = '100%';
-    win.document.body.style.overflow = 'hidden';
-    const iframe = win.document.createElement('iframe');
-    iframe.style.border = 'none';
-    iframe.style.width = '100%';
-    iframe.style.height = '100%';
-    iframe.style.margin = '0';
-    iframe.style.display = 'block';
-
-    // Set the iframe src to the proxy URL
-    iframe.src = proxyUrl;
-    win.document.body.appendChild(iframe);
-
-    // Retry mechanism: if the iframe fails to load (SW wasn't fully ready),
-    // re-set the src after a short delay to give the SW time to start intercepting
-    const retryLoad = () => {
-      try {
-        // Check if the iframe is still about:blank or failed to load
-        const iframeSrc = iframe.contentWindow?.location?.href;
-        if (iframeSrc === 'about:blank' || !iframeSrc) {
-          iframe.src = proxyUrl;
-        }
-      } catch (e) {
-        // Cross-origin means it loaded something — that's good
-      }
-    };
-
-    // Retry at 1.5s and 3s if needed
-    setTimeout(retryLoad, 1500);
-    setTimeout(retryLoad, 3000);
+    // Write a complete, self-contained HTML document into the popup.
+    // This makes the page independent of the opener — it will keep working
+    // even after this launcher tab is closed.
+    const escapedUrl = proxyUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    win.document.open();
+    win.document.write(
+      '<!DOCTYPE html>' +
+      '<html style="height:100%">' +
+      '<head><title>Winston</title></head>' +
+      '<body style="margin:0;height:100%;overflow:hidden">' +
+      '<iframe src="' + escapedUrl + '" ' +
+      'style="border:none;width:100%;height:100%;margin:0;display:block" ' +
+      'allowfullscreen></iframe>' +
+      '</body></html>'
+    );
+    win.document.close();
 
     setDone(true);
     setFavicon(DONE_STEP.emoji);
     document.title = DONE_STEP.title;
 
+    // Wait a bit for the iframe inside the popup to start loading before
+    // attempting to close this launcher tab. If window.close() is blocked
+    // by the browser, show the "you can close this tab" message instead.
     setTimeout(() => {
       window.close();
+      // If we're still here (browser blocked window.close), show the message
       setTimeout(() => {
         setCloseMsg(CLOSE_MSG);
-      }, 300);
-    }, 600);
+      }, 400);
+    }, 1500);
   }, [waitForSW]);
 
   useEffect(() => {
