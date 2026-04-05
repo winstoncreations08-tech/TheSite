@@ -1,7 +1,6 @@
-services:
+ services:
   - type: web
     name: educational-website
     env: node
     plan: free
-    buildCommand: npm install --include=dev && npm run build
-    startCommand: node server.js
+    startCommand: npm install && npm run build && node server.js
