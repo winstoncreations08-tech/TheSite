@@ -96,7 +96,7 @@ const Home = () => {
     }
 
     opened.current = true;
-
+    setShowFallback(false);
     setDone(true);
     setFavicon(DONE_STEP.emoji);
     document.title = DONE_STEP.title;
@@ -109,40 +109,44 @@ const Home = () => {
   useEffect(() => {
     setFavicon(STEPS[0].emoji);
     document.title = STEPS[0].title;
+    let isCancelled = false;
 
-    const stepInterval = setInterval(() => {
-      if (opened.current) return;
+    const transitionToStep = async (nextStep) => {
+      if (isCancelled) return;
       setFadeIn(false);
-      setTimeout(() => {
-        setStep((prev) => {
-          const next = Math.min(prev + 1, STEPS.length - 1);
-          if (!opened.current) {
-            setFavicon(STEPS[next].emoji);
-            document.title = STEPS[next].title;
-          }
-          return next;
-        });
-        setFadeIn(true);
-      }, 300);
-    }, 650);
+      await new Promise((r) => setTimeout(r, 300));
+      if (isCancelled) return;
+      setStep(nextStep);
+      setFavicon(STEPS[nextStep].emoji);
+      document.title = STEPS[nextStep].title;
+      setFadeIn(true);
+      await new Promise((r) => setTimeout(r, 650));
+    };
 
-    const openTimer = setTimeout(() => {
-      openProxiedTab();
-    }, 2600);
+    const runSequence = async () => {
+      await new Promise((r) => setTimeout(r, 650));
+      if (isCancelled) return;
 
-    // Show fallback button 2s after "Redirecting now..." appears
-    const fallbackTimer = setTimeout(() => {
-      if (!opened.current) {
-        setShowFallback(true);
+      const swPromise = waitForSW();
+      await transitionToStep(1);
+      await transitionToStep(2);
+      
+      // Block here until SW is actually ready
+      await swPromise;
+      
+      await transitionToStep(3);
+
+      if (!isCancelled) {
+        openProxiedTab();
       }
-    }, 4600);
+    };
+
+    runSequence();
 
     return () => {
-      clearInterval(stepInterval);
-      clearTimeout(openTimer);
-      clearTimeout(fallbackTimer);
+      isCancelled = true;
     };
-  }, [openProxiedTab]);
+  }, [waitForSW, openProxiedTab]);
 
   const currentMsg = done ? DONE_STEP.message : STEPS[step].message;
   const progress = done ? 100 : Math.min(((step + 1) / STEPS.length) * 100, 100);
