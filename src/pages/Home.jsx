@@ -83,8 +83,21 @@ const Home = () => {
 
   const handleManualOpen = useCallback(() => {
     const proxyUrl = buildProxyUrl(PROXY_TARGET, false, 'auto');
-    if (proxyUrl) {
-      window.open(proxyUrl, '_blank');
+    if (!proxyUrl) return;
+
+    const win = window.open(proxyUrl, '_blank');
+    if (win && !win.closed) {
+      setDone(true);
+      setFavicon(DONE_STEP.emoji);
+      document.title = DONE_STEP.title;
+      setShowFallback(false);
+
+      setTimeout(() => {
+        window.close();
+        setTimeout(() => {
+          setCloseMsg(CLOSE_MSG);
+        }, 400);
+      }, 1500);
     }
   }, []);
 
