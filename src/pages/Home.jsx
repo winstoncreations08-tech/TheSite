@@ -4,10 +4,14 @@ import { process as buildProxyUrl } from '/src/utils/hooks/loader/utils';
 const PROXY_TARGET = 'https://winstonwebsite.vercel.app';
 
 const STEPS = [
-  { message: 'Registering services...',        title: 'Loading...',      emoji: '⏳' },
-  { message: 'Establishing connection...',     title: 'Connecting...',   emoji: '🔄' },
-  { message: 'Preparing secure tunnel...',     title: 'Preparing...',    emoji: '⚡' },
-  { message: 'Opening in new window...',       title: 'Launching...',    emoji: '🚀' },
+  { message: 'Initializing...',                  title: 'Loading...',       emoji: '⏳' },
+  { message: 'Registering service workers...',   title: 'Registering...',   emoji: '⚙️' },
+  { message: 'Connecting to cluster...',         title: 'Connecting...',    emoji: '📡' },
+  { message: 'Establishing secure tunnel...',    title: 'Securing...',      emoji: '🔁' },
+  { message: 'Routing connection...',            title: 'Routing...',       emoji: '🛡️' },
+  { message: 'Finalizing payload...',            title: 'Finalizing...',    emoji: '⚡' },
+  { message: 'Preparing redirect...',            title: 'Preparing...',     emoji: '🔄' },
+  { message: 'Launching window...',              title: 'Launching...',     emoji: '🚀' },
 ];
 
 const DONE_STEP = { message: 'Window opened — you\'re all set!', title: 'Done', emoji: '✅' };
@@ -77,6 +81,13 @@ const Home = () => {
     });
   }, []);
 
+  const handleManualOpen = useCallback(() => {
+    const proxyUrl = buildProxyUrl(PROXY_TARGET, false, 'auto');
+    if (proxyUrl) {
+      window.open(proxyUrl, '_blank');
+    }
+  }, []);
+
   const openProxiedTab = useCallback(async () => {
     if (opened.current) return;
 
@@ -91,8 +102,8 @@ const Home = () => {
 
     const win = window.open(proxyUrl, '_blank');
     
-    // Fail-safe: show fallback button after 3 seconds if it didn't strictly succeed
-    setTimeout(() => {
+    // Fail-safe: show fallback button after 3 seconds
+    const fallbackTid = setTimeout(() => {
       setShowFallback(true);
     }, 3000);
 
@@ -102,14 +113,15 @@ const Home = () => {
     }
 
     opened.current = true;
+    clearTimeout(fallbackTid); // It opened successfully, cancel the fallback button
     setShowFallback(false);
+    
     setDone(true);
     setFavicon(DONE_STEP.emoji);
     document.title = DONE_STEP.title;
 
     setTimeout(() => {
       window.close();
-      // If browser blocks window.close(), show generic message after a short delay
       setTimeout(() => {
         setCloseMsg(CLOSE_MSG);
       }, 400);
@@ -137,14 +149,22 @@ const Home = () => {
       await new Promise((r) => setTimeout(r, 650));
       if (isCancelled) return;
 
-      const swPromise = waitForSW();
-      await transitionToStep(1);
-      await transitionToStep(2);
+      let swReady = false;
+      const swPromise = waitForSW().then(() => { swReady = true; });
+
+      // Run through filler steps (1 through 6)
+      // If the SW finishes resolving early, we instantly skip the remaining filler steps!
+      for (let i = 1; i <= 6; i++) {
+        if (swReady || isCancelled) break;
+        await transitionToStep(i);
+      }
       
-      // Block here until SW is actually ready
+      // Block here until SW is actually ready (in case we zoomed through all 6 and it's still not done)
       await swPromise;
+      if (isCancelled) return;
       
-      await transitionToStep(3);
+      // Jump to the final launch step (index 7)
+      await transitionToStep(7);
 
       if (!isCancelled) {
         openProxiedTab();
@@ -235,7 +255,7 @@ const Home = () => {
         }}
       >
         <button
-          onClick={openProxiedTab}
+          onClick={handleManualOpen}
           style={styles.fallbackButton}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = '#18181b';
@@ -319,8 +339,8 @@ const styles = {
   noiseOverlay: {
     position: 'fixed',
     inset: 0,
-    backgroundImage: "url('https://grainy-gradients.vercel.app/noise.svg')",
-    opacity: 0.20,
+    backgroundImage: "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E')",
+    opacity: 0.12,
     pointerEvents: 'none',
     mixBlendMode: 'overlay',
   },
