@@ -90,6 +90,12 @@ const Home = () => {
     }
 
     const win = window.open(proxyUrl, '_blank');
+    
+    // Fail-safe: show fallback button after 3 seconds if it didn't strictly succeed
+    setTimeout(() => {
+      setShowFallback(true);
+    }, 3000);
+
     if (!win || win.closed) {
       setShowFallback(true);
       return;
@@ -102,8 +108,12 @@ const Home = () => {
     document.title = DONE_STEP.title;
 
     setTimeout(() => {
-      setCloseMsg(CLOSE_MSG);
-    }, 800);
+      window.close();
+      // If browser blocks window.close(), show generic message after a short delay
+      setTimeout(() => {
+        setCloseMsg(CLOSE_MSG);
+      }, 400);
+    }, 1500);
   }, [waitForSW]);
 
   useEffect(() => {
