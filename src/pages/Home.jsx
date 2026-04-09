@@ -82,9 +82,47 @@ const Home = () => {
   }, []);
 
   const handleManualOpen = useCallback(async () => {
-    // Open a blank tab synchronously to preserve the user gesture
-    // and bypass the popup blocker, then set the location after SW is ready.
+    // Fast path: if the service worker is already actively controlling, 
+    // we can skip the interstitial loading screen completely.
+    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+      const proxyUrl = buildProxyUrl(PROXY_TARGET, false, 'auto');
+      if (proxyUrl) {
+        const win = window.open(proxyUrl, '_blank');
+        if (win && !win.closed) {
+          setDone(true);
+          setFavicon(DONE_STEP.emoji);
+          document.title = DONE_STEP.title;
+          setTimeout(() => {
+            window.close();
+            setTimeout(() => setCloseMsg(CLOSE_MSG), 400);
+          }, 1500);
+          return;
+        }
+      }
+    }
+
+    // Otherwise, open a styled interstitial tab synchronously to preserve the user gesture
+    // while we wait for the SW to spin up.
     const win = window.open('about:blank', '_blank');
+    if (win) {
+      win.document.write(`
+        <html style="background: #09090b; color: #a1a1aa; font-family: 'Inter', system-ui, sans-serif;">
+          <head>
+            <title>Loading...</title>
+            <style>
+              @keyframes spin { 100% { transform: rotate(360deg); } }
+            </style>
+          </head>
+          <body style="display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0;">
+            <div style="text-align: center;">
+              <div style="width: 40px; height: 40px; border: 2.5px solid #27272a; border-top-color: #a1a1aa; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; box-sizing: border-box;"></div>
+              <p style="font-weight: 500; font-size: 14px; margin: 0; letter-spacing: 0.3px;">Securing connection...</p>
+            </div>
+          </body>
+        </html>
+      `);
+      win.document.close();
+    }
     
     await waitForSW();
 
@@ -95,7 +133,7 @@ const Home = () => {
     }
 
     if (win) {
-      win.location.href = proxyUrl;
+      win.location.replace(proxyUrl);
       
       setDone(true);
       setFavicon(DONE_STEP.emoji);
