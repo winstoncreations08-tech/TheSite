@@ -81,11 +81,15 @@ const Home = () => {
     });
   }, []);
 
-  const handleManualOpen = useCallback(() => {
+  const handleManualOpen = useCallback(async () => {
+    // Manual click is the best way to bypass popup blockers,
+    // but we still wait for the SW so the proxy URL is usable immediately.
+    await waitForSW();
+
     const proxyUrl = buildProxyUrl(PROXY_TARGET, false, 'auto');
     if (!proxyUrl) return;
 
-    const win = window.open(proxyUrl, '_blank');
+    const win = window.open(proxyUrl, '_blank', 'noopener,noreferrer');
     if (win && !win.closed) {
       setDone(true);
       setFavicon(DONE_STEP.emoji);
@@ -98,8 +102,11 @@ const Home = () => {
           setCloseMsg(CLOSE_MSG);
         }, 400);
       }, 1500);
+    } else {
+      // If even the manual click is blocked, keep the button visible.
+      setShowFallback(true);
     }
-  }, []);
+  }, [waitForSW]);
 
   const openProxiedTab = useCallback(async () => {
     if (opened.current) return;
@@ -113,12 +120,11 @@ const Home = () => {
       return;
     }
 
+    // As soon as we *can* open, show the fallback immediately.
+    // If the popup is blocked, the user can click right away.
+    setShowFallback(true);
+
     const win = window.open(proxyUrl, '_blank');
-    
-    // Fail-safe: show fallback button after 3 seconds
-    const fallbackTid = setTimeout(() => {
-      setShowFallback(true);
-    }, 3000);
 
     if (!win || win.closed) {
       setShowFallback(true);
@@ -126,7 +132,6 @@ const Home = () => {
     }
 
     opened.current = true;
-    clearTimeout(fallbackTid); // It opened successfully, cancel the fallback button
     setShowFallback(false);
     
     setDone(true);
