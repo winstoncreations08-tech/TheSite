@@ -82,15 +82,21 @@ const Home = () => {
   }, []);
 
   const handleManualOpen = useCallback(async () => {
-    // Manual click is the best way to bypass popup blockers,
-    // but we still wait for the SW so the proxy URL is usable immediately.
+    // Open a blank tab synchronously to preserve the user gesture
+    // and bypass the popup blocker, then set the location after SW is ready.
+    const win = window.open('about:blank', '_blank');
+    
     await waitForSW();
 
     const proxyUrl = buildProxyUrl(PROXY_TARGET, false, 'auto');
-    if (!proxyUrl) return;
+    if (!proxyUrl) {
+      if (win) win.close();
+      return;
+    }
 
-    const win = window.open(proxyUrl, '_blank', 'noopener,noreferrer');
-    if (win && !win.closed) {
+    if (win) {
+      win.location.href = proxyUrl;
+      
       setDone(true);
       setFavicon(DONE_STEP.emoji);
       document.title = DONE_STEP.title;
@@ -103,7 +109,6 @@ const Home = () => {
         }, 400);
       }, 1500);
     } else {
-      // If even the manual click is blocked, keep the button visible.
       setShowFallback(true);
     }
   }, [waitForSW]);
@@ -268,8 +273,8 @@ const Home = () => {
       <div
         style={{
           ...styles.fallbackWrapper,
-          opacity: showFallback && !done ? 1 : 0,
-          pointerEvents: showFallback && !done ? 'auto' : 'none',
+          opacity: !done ? 1 : 0,
+          pointerEvents: !done ? 'auto' : 'none',
         }}
       >
         <button
@@ -288,7 +293,7 @@ const Home = () => {
             e.currentTarget.style.color = '#a1a1aa';
           }}
         >
-          Didn't open? Click here
+          Open in new tab
         </button>
       </div>
 
