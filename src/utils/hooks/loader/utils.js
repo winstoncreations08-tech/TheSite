@@ -14,7 +14,14 @@ const check = (inp, engine) => {
   if (isUrl) {
     return trimmed.startsWith('http') ? trimmed : `https://${trimmed}`;
   } else {
-    return engine + encodeURIComponent(trimmed);
+    const searchUrl = engine + encodeURIComponent(trimmed);
+    // Google is often blocked behind extra checks inside proxies.
+    // Routing the Google results page through Google Translate ("translator thing")
+    // makes it load reliably for many filtered networks.
+    if (/^https?:\/\/www\.google\.com\/search\?q=/i.test(engine)) {
+      return `https://translate.google.com/translate?sl=auto&tl=en&u=${encodeURIComponent(searchUrl)}`;
+    }
+    return searchUrl;
   }
 };
 
@@ -67,14 +74,7 @@ export const process = (input, decode = false, prType, engine = "https://www.goo
 };
 
 export function openEmbed(url) {
-  var win = window.open();
-  win.document.body.style.margin = "0";
-  win.document.body.style.height = "100vh";
-  var iframe = win.document.createElement("iframe");
-  iframe.style.border = "none";
-  iframe.style.width = "100%";
-  iframe.style.height = "100%";
-  iframe.style.margin = "0";
-  iframe.src = url;
-  win.document.body.appendChild(iframe);
+  // Open in a real tab (same-origin) so the proxy SW can control it.
+  // Embedding in about:blank breaks the service worker scope (proxy won't work).
+  window.open(url, '_blank', 'noopener,noreferrer');
 }

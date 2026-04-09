@@ -2,10 +2,11 @@ import clsx from 'clsx';
 import loaderStore from '/src/utils/hooks/loader/useLoaderStore';
 import StaticError from './viewer/StaticError';
 import { useOptions } from '/src/utils/optionsContext';
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useMemo, useState } from 'react';
 import { Loader } from 'lucide-react';
 
 import NewTab from './NewTab';
+import { process as decodeMaybe } from '/src/utils/hooks/loader/utils';
 
 const Viewer = ({ conf = {} }) => {
   const tabs = loaderStore((state) => state.tabs);
@@ -25,6 +26,46 @@ const Viewer = ({ conf = {} }) => {
   const activeFrameRef = loaderStore((state) => state.activeFrameRef);
   const enableAlerts = conf.alerts ?? true;
 
+  const [toast, setToast] = useState('');
+  const toastTimerRef = useRef(null);
+  const searchLockRef = useRef({});
+
+  const engineHost = useMemo(() => {
+    try {
+      return options?.engine ? new URL(options.engine).hostname.replace(/^www\./, '') : null;
+    } catch {
+      return null;
+    }
+  }, [options?.engine]);
+
+  const isSearchResultsUrl = (decodedUrl) => {
+    if (!decodedUrl) return false;
+    try {
+      const u = new URL(decodedUrl);
+      const host = u.hostname.replace(/^www\./, '');
+      if (!engineHost) return false;
+      if (host !== engineHost) return false;
+
+      // Common search engine result paths
+      if (host.includes('google.') && u.pathname === '/search') return true;
+      if (host.includes('bing.') && u.pathname === '/search') return true;
+      if (host.includes('duckduckgo.') && u.pathname === '/') return u.searchParams.has('q');
+      if (host.includes('search.yahoo.') && u.pathname === '/search') return true;
+      if (host.includes('startpage.') && u.pathname.includes('/sp/search')) return true;
+
+      // Fallback: any page with a q= param on the engine host is treated as "search"
+      return u.searchParams.has('q');
+    } catch {
+      return false;
+    }
+  };
+
+  const showToast = (msg) => {
+    setToast(msg);
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => setToast(''), 4500);
+  };
+
   useEffect(() => {
     setFrameRefs(frameRefs);
     const tabIds = new Set(tabs.map((t) => t.id));
@@ -39,6 +80,17 @@ const Viewer = ({ conf = {} }) => {
       if (tab.url === 'tabs://new') return;
       const iframe = frameRefs.current[tab.id];
       if (!iframe) return;
+
+      // Determine if this tab is a "search results" tab that should not navigate inside the frame.
+      try {
+        const decoded = decodeMaybe(tab.url, true, options.prType || 'auto', options.engine || undefined);
+        if (decoded && isSearchResultsUrl(decoded)) {
+          searchLockRef.current[tab.id] = true;
+        } else if (decoded && !isSearchResultsUrl(decoded)) {
+          searchLockRef.current[tab.id] = false;
+        }
+      } catch {}
+
       const handleLoad = () => {
         setLoading(tab.id, false);
         try {
@@ -56,6 +108,30 @@ const Viewer = ({ conf = {} }) => {
           const curURL = iframe.contentWindow.location.href;
           const curTTL = iframe.contentWindow.document.title;
           if (curURL === 'about:blank') return;
+
+          // If this tab started as a search results page, block in-frame navigation.
+          // Instead, instruct the user to open links in a new tab/browser.
+          const isLocked = !!searchLockRef.current[tab.id];
+          if (isLocked && curURL !== tab.url) {
+            let decodedCur = '';
+            let decodedTab = '';
+            try {
+              decodedCur = decodeMaybe(curURL, true, options.prType || 'auto', options.engine || undefined);
+              decodedTab = decodeMaybe(tab.url, true, options.prType || 'auto', options.engine || undefined);
+            } catch {}
+
+            // If the iframe navigated away from the search results page, snap back.
+            if (decodedCur && decodedTab && !isSearchResultsUrl(decodedCur) && isSearchResultsUrl(decodedTab)) {
+              try {
+                iframe.contentWindow.location.replace(tab.url);
+              } catch {}
+
+              // Keep the tab URL unchanged, and show instructions.
+              showToast('Please right-click results and open in a new tab/browser to work.');
+              return;
+            }
+          }
+
           // url shouldnt be updating if tab is still loading...will cause race condition
           if (!tab.isLoading && curURL !== prevURL.current[tab.id] && curURL !== tab.url) {
             prevURL.current[tab.id] = curURL;
@@ -116,7 +192,7 @@ const Viewer = ({ conf = {} }) => {
       });
       clearInterval(interval);
     };
-  }, [tabs, setLoading, updateTitle, setIframeUrl, enableAlerts]);
+  }, [tabs, setLoading, updateTitle, setIframeUrl, enableAlerts, options.prType, options.engine, engineHost]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -157,6 +233,13 @@ const Viewer = ({ conf = {} }) => {
 
   return (
     <div className="relative w-full h-full">
+      {toast && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-70 px-4 w-full max-w-lg pointer-events-none">
+          <div className="rounded-xl border border-amber-500/30 bg-[#0b0f16]/95 backdrop-blur-xl px-4 py-3 text-sm text-amber-200 shadow-2xl">
+            {toast}
+          </div>
+        </div>
+      )}
       {tabs.map(({ id, url, active }) => {
         if (url === 'tabs://new') return null;
         return (
